@@ -27,15 +27,10 @@ use OC\Files\Storage\Storage;
 use OC\Files\Storage\Wrapper\Wrapper;
 use OCP\Files\ForbiddenException;
 use OCP\Files\Storage\IWriteStreamStorage;
-use OCP\IUserManager;
 
 class StorageWrapper extends Wrapper implements IWriteStreamStorage {
-	private $mountPoint;
-
-	/** @var  IUserManager */
-	private $userManager;
-
-	private $userSession;
+	/** @var string */
+	public $mountPoint;
 
 	/**
 	 * @param array $parameters
@@ -43,7 +38,6 @@ class StorageWrapper extends Wrapper implements IWriteStreamStorage {
 	public function __construct($parameters) {
 		parent::__construct($parameters);
 		$this->mountPoint = $parameters['mountPoint'];
-		$this->userSession = $parameters['userSession'];
 	}
 
 	/**
@@ -60,7 +54,7 @@ class StorageWrapper extends Wrapper implements IWriteStreamStorage {
 			$staticmimecontrolrulesfiltered = array_filter($staticmimecontrolrules, function ($value) use ($path, $mimetype) {
 				$pathmatch = preg_match('%' . $value["path"] . '%', $path);
 				$mimematch = preg_match('%' . $value["mime"] . '%', $mimetype);
-				return ($pathmatch && $mimematch);
+				return [$pathmatch,$mimematch];
 			});
 			return $staticmimecontrolrulesfiltered;
 		}
@@ -93,20 +87,7 @@ class StorageWrapper extends Wrapper implements IWriteStreamStorage {
 	 * @throws ForbiddenException
 	 */
 	protected function checkFileAccess(string $path, bool $isDir = false): void {
-		$currentusersession = $this->userSession->getUser();
-		$currentmountpoint = $this->mountPoint;
-		$storagetypeobj = $this->storage->storage->storage;
-
-		if ($storagetypeobj != null) {
-			$storagetype = get_class($storagetypeobj);
-		} else {
-			$storagetype = "NotAvailable";
-		}
-
-
-
 		$prefix = "files";
-
 		if (isset($this->readConfig()["denyrootbydefault"])) {
 			$denyroot = $this->readConfig()["denyrootbydefault"];
 		} else {
@@ -135,16 +116,21 @@ class StorageWrapper extends Wrapper implements IWriteStreamStorage {
 					return;
 				}
 				$cfg = $this->readRules(dirname($newpath), $mime);
-
-
-
-				if (count($cfg) === 0) {
-					if (isset($mime)) {
-						$msg = 'Access denied to '.$mime. ' in Folder '. $newpath;
-					} else {
-						$msg = 'Access denied in Folder '. $newpath;
+				
+				$isRestrictedPath = false;
+				$canAccess = false;
+				
+				for($i =0; $i < count($cfg); $i++) {
+					if ($cfg[$i]["path"] == dirname($newpath)) {
+						$isRestrictedPath = true;
+						if(stripslashes($cfg[$i]["mime"]) == $mime) {
+							$canAccess = true;
+						}
 					}
-
+				}
+				
+				if($isRestrictedPath && !$canAccess) {
+					$msg = 'Access denied to '.$mime. ' in Folder '. $newpath;
 					error_log($msg, 0);
 					throw new ForbiddenException($msg, false);
 				}

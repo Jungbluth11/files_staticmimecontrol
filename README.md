@@ -1,5 +1,7 @@
 # Files Staticmimecontrol
 
+(modified to use whitelist instead of blacklist)
+
 This Files Staticmimecontrol app for Nextcloud enables administrators to whitelist specific mime types per folder with matching from a static rule file. This App is based on the work of [files_accesscontrol](https://github.com/nextcloud/files_accesscontrol).
 
 [It is available via the Nextcloud App Store](https://apps.nextcloud.com/apps/files_staticmimecontrol)
